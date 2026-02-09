@@ -20,6 +20,7 @@ from .models import (
     SectorAllocationPostProcessor,
     TopKLongShortAllocator,
     WeightsFromSignalsModel,
+    combine_models_to_weights,
 )
 from .plots import plot_backtest_result
 from .stat_arb import PairTradingModel, compute_pair_diagnostics, plot_pair_diagnostics
@@ -37,6 +38,7 @@ __all__ = [
     "SectorAllocationPostProcessor",
     "TopKLongShortAllocator",
     "WeightsFromSignalsModel",
+    "combine_models_to_weights",
     "compute_pair_diagnostics",
     "compute_performance_stats",
     "load_cleaned_assets",
