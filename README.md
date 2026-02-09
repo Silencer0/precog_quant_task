@@ -37,8 +37,9 @@ go through the italicised notebooks in the repo structure and run them.
 		python code implementations
 	- Report: final report
 
+- To see images please open the report pdf present in the directory
 
-challenge: Quant (congrats congrats money money $ $ $ $)
+# challenge: Quant (congrats congrats money money $ $ $ $)
 
 Completed: 
 - task 1) data cleaning , feature extraction
@@ -50,7 +51,6 @@ Didnt complete:
 - bonus) mapping the given dataset to real world assets
 
 ## Summary
-
 - wow, what an adventure this was!
 - This document sumarises all the research , findings , results from all the experiments I ran for completing the task
 - **1) Data cleaning, Feature extraction**
