@@ -7,37 +7,34 @@ pip install -r requirements.txt
 ```
 go through the italicised notebooks in the repo structure and run them.
 
-# Repo Structure
-quant-task
-	another testing engine : open source event based implementation
-	Dataset
-		archived: original dataset
-		cleaned: dataset after cleaning
-		features: dataset with all features extracted
-	MISC: Sources , random files
-	**Notebooks**:
-		Alphas: just an experiment on using the 101 alphas
-		*Bayesian Models*: bayesian ml models
-		*Boosted Algos*: Boosted random forests
-		Candlestick analysis: analysis of using candlesticks for predictions
-		Clustering analysis
-		*cointegrated movement: task 4*
-		CNNS
-		Finmamba
-		HGG
-		*Random forest models*: ml models using random forests , decision trees
-		*08_time_series models: arma , arima models*
-		*Backtester ipynbs: task 3*
-		*data cleaning , feature extraction ipynbs : task 1*
-		Heiken Ashi ipynbs
-		*linear regression ipynbs*
-		*decomposition ipynbs*
-		regular indicators ipynbs
-		
-	
-	SRC:
+ - quant-task
+	- another testing engine : open source event based implementation
+	- Dataset
+		- archived: original dataset
+		- cleaned: dataset after cleaning
+		- features: dataset with all features extracted
+	- MISC: Sources , random files
+	- **Notebooks**:
+		- Alphas: just an experiment on using the 101 alphas
+		- *Bayesian Models*: bayesian ml models
+		- *Boosted Algos*: Boosted random forests
+		- Candlestick analysis: analysis of using candlesticks for predictions
+		- Clustering analysis
+		- *cointegrated movement: task 4*
+		- CNNS
+		- Finmamba
+		- HGG
+		- *Random forest models*: ml models using random forests , decision trees
+		- *08_time_series models: arma , arima models*
+		- *Backtester ipynbs: task 3*
+		- *data cleaning , feature extraction ipynbs : task 1*
+		- Heiken Ashi ipynbs
+		- *linear regression ipynbs*
+		- *decomposition ipynbs*
+		- regular indicators ipynbs
+	- SRC:
 		python code implementations
-	Report: final report
+	- Report: final report
 
 
 challenge: Quant (congrats congrats money money $ $ $ $)
