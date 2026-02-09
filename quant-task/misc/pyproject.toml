@@ -1,0 +1,11 @@
+[tool.basedpyright]
+venvPath = "/home/anivarth/college/quant-task"
+venv = ".venv"
+pythonVersion = "3.13"
+typeCheckingMode = "basic"
+reportMissingImports = false
+
+[dependency-groups]
+dev = [
+    "bokeh==3.4.3",
+]

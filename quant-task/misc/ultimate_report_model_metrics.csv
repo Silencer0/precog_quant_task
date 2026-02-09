@@ -1,0 +1,68 @@
+notebook,title,CAGR [%],Sharpe,Max Drawdown [%]
+notebooks/ML_Linear_Models_01_OLS_Ridge_Lasso.ipynb,Linear Model (ridge) - Original Style 1N,16.959697,0.894865,-38.488
+notebooks/ML_Linear_Models_01_OLS_Ridge_Lasso.ipynb,Linear Model (ridge) - Original Style MPT,17.731467,0.938796,-34.178475
+notebooks/ML_Linear_Models_02_ElasticNet.ipynb,Linear Model (elasticnet) - Original Style 1N,16.710969,0.925644,-35.774485
+notebooks/ML_Linear_Models_02_ElasticNet.ipynb,Linear Model (elasticnet) - Original Style MPT,14.724528,0.79301,-34.308294
+notebooks/ML_Linear_Models_03_BayesianRidge.ipynb,Linear Model (bayesianridge) - Original Style 1N,15.955106,0.849282,-37.144722
+notebooks/ML_Linear_Models_03_BayesianRidge.ipynb,Linear Model (bayesianridge) - Original Style MPT,16.721692,0.892932,-35.516285
+notebooks/ML_Linear_Models_04_TimeSplit_OLS_Ridge_Lasso.ipynb,TimeSplit Linear (ridge) - Original Style 1N (Test Window),33.362219,1.503062,-22.607705
+notebooks/ML_Linear_Models_04_TimeSplit_OLS_Ridge_Lasso.ipynb,TimeSplit Linear (ridge) - Original Style MPT (Test Window),24.474231,1.168396,-27.840206
+notebooks/ML_Linear_Models_05_SMC_Indicators_TimeSplit.ipynb,SMC Linear (ols) - 1/N (Test Window),8.187535,0.486278,-22.598123
+notebooks/ML_Linear_Models_05_SMC_Indicators_TimeSplit.ipynb,SMC Linear (ridge) - 1/N (Test Window),23.50101,1.064191,-21.478081
+notebooks/ML_Linear_Models_05_SMC_Indicators_TimeSplit.ipynb,SMC Linear (lasso) - 1/N (Test Window),26.235639,1.396587,-18.490968
+notebooks/ML_Linear_Models_05_SMC_Indicators_TimeSplit.ipynb,SMC Linear (lasso) - MPT (Test Window),11.746236,0.76154,-21.849477
+notebooks/Original_Style_1N.ipynb,OBV Divergence Strategy,18.476995,1.020018,-33.348459
+notebooks/Original_Style_1N.ipynb,A/D Divergence Strategy,19.247701,1.046417,-32.49443
+notebooks/Original_Style_1N.ipynb,RSI Strategy,20.048042,1.054984,-35.106321
+notebooks/Original_Style_1N.ipynb,MACD Strategy,15.780972,0.958961,-24.866126
+notebooks/Original_Style_1N.ipynb,Aroon Strategy,15.51511,0.948653,-29.783701
+notebooks/Original_Style_1N.ipynb,Ichimoku Strategy,15.507275,0.989093,-25.484508
+notebooks/Original_Style_1N.ipynb,SMA Golden Cross Strategy,16.510455,1.00892,-32.258407
+notebooks/Original_Style_MPT.ipynb,OBV Divergence Strategy,16.109601,0.909969,-31.23273
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 001,-10.753469,-2.109452,-67.575958
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 002,-7.090334,-2.222187,-53.099686
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 003,-7.715197,-2.165121,-55.04658
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 004,-9.154082,-1.662835,-61.840631
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 005,-12.744258,-2.467293,-74.549016
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 006,-6.867977,-1.450781,-51.301245
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 007,-18.496057,-2.915052,-86.130851
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 008,-7.535819,-1.427579,-53.9769
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 009,-20.469854,-3.826114,-89.990318
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 010,-17.237871,-4.22625,-85.123124
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 011,-10.939085,-2.600474,-68.416009
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 012,-17.805699,-3.758271,-86.684842
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 013,-7.44725,-2.504522,-53.75082
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 014,-11.607774,-2.341809,-71.126833
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 015,-15.345619,-2.56349,-81.209105
+notebooks/alphas/101_alphas_backtests.ipynb,Alpha 016,-9.702411,-3.3256,-63.810937
+notebooks/bayesian models/01_conjugate_priors_beta_binomial_direction.ipynb,Bayes Conjugate Priors (Beta-Binomial) - 1N,22.053517,1.483627,-12.921751
+notebooks/bayesian models/01_conjugate_priors_beta_binomial_direction.ipynb,Bayes Conjugate Priors (Beta-Binomial) - MPT,10.841123,0.750565,-13.418566
+notebooks/bayesian models/03_bayesian_logistic_regression_mcmc_metropolis.ipynb,Bayes Logistic Regression (MH MCMC) - 1N,25.092596,1.371819,-18.137274
+notebooks/bayesian models/03_bayesian_logistic_regression_mcmc_metropolis.ipynb,Bayes Logistic Regression (MH MCMC) - MPT,12.051576,0.771102,-23.362502
+notebooks/bayesian models/04_bayesian_logistic_regression_variational_inference.ipynb,Bayes Logistic Regression (VI) - 1N,13.095023,0.81309,-17.262441
+notebooks/bayesian models/04_bayesian_logistic_regression_variational_inference.ipynb,Bayes Logistic Regression (VI) - MPT,-0.532981,0.057541,-22.022878
+notebooks/bayesian models/05_bayesian_sharpe_ratio_asset_selection.ipynb,Bayes Sharpe Ratio (P[SR&gt;0]) - 1N,21.413185,1.315634,-13.072936
+notebooks/bayesian models/05_bayesian_sharpe_ratio_asset_selection.ipynb,Bayes Sharpe Ratio (P[SR&gt;0]) - MPT,17.129073,1.072677,-13.69582
+notebooks/bayesian models/06_bayesian_rolling_regression_pairs_trading.ipynb,Bayes Rolling Regression (Pairs) - Long/Short,-9.86604,-1.091691,-17.012709
+notebooks/bayesian models/07_stochastic_volatility_particle_filter.ipynb,Stochastic Volatility (Particle Filter) - 1N,27.727263,1.684742,-12.852631
+notebooks/bayesian models/07_stochastic_volatility_particle_filter.ipynb,Stochastic Volatility (Particle Filter) - MPT,20.139548,1.222446,-15.593907
+notebooks/bayesian models/08_bayesian_logistic_regression_mcmc_nuts.ipynb,Bayes Logistic Regression (NUTS) - 1N,25.433826,1.269686,-19.680988
+notebooks/bayesian models/08_bayesian_logistic_regression_mcmc_nuts.ipynb,Bayes Logistic Regression (NUTS) - MPT,14.223194,0.800078,-25.489476
+notebooks/bayesian models/feature_dataset/01_conjugate_priors_beta_binomial_direction_features.ipynb,Conjugate Priors (Feature Store) - 1N,21.145548,1.433001,-12.921751
+notebooks/bayesian models/feature_dataset/01_conjugate_priors_beta_binomial_direction_features.ipynb,Conjugate Priors (Feature Store) - MPT,8.901471,0.637857,-13.418566
+notebooks/boosted algorithms/01_adaboost_classifier_time_split.ipynb,AdaBoostClassifier (Time Split) - Weekly Top-K Long-Only,12.567775,0.769042,-15.924873
+notebooks/boosted algorithms/02_gradient_boosting_classifier_time_split.ipynb,GradientBoostingClassifier (Time Split) - Weekly Top-K Long-Only,15.845085,0.880362,-14.199231
+notebooks/convolutional neural nets/01_autoregressive_1d_cnn_time_split.ipynb,Autoregressive 1D CNN (Conv1d) - Time Split,4.33095,0.318121,-19.777488
+notebooks/convolutional neural nets/02_cnn_ta_small_2d_cnn_time_split.ipynb,CNN-TA Small 2D CNN (Conv2d) - Time Split,15.466812,0.833904,-17.801731
+notebooks/hierarchical graph neural network/05_lstm_time_split.ipynb,LSTM - Time Split,18.338928,0.91287,-19.959862
+notebooks/hierarchical graph neural network/09_hgnn_m_time_split.ipynb,HGNN_M (node+macro) - Time Split,10.03192,0.592807,-18.986846
+notebooks/hierarchical graph neural network/10_hgnn_i_time_split.ipynb,HGNN_I (node+relation) - Time Split,18.145175,0.882607,-19.594495
+notebooks/hierarchical graph neural network/11_hgnn_full_time_split.ipynb,HGNN (node+relation+macro) - Time Split,15.016678,0.74381,-20.126466
+notebooks/random forest models/01_decision_tree_regressor.ipynb,Backtest Report,16.234722,0.90789,-34.359566
+notebooks/random forest models/02_decision_tree_classifier.ipynb,Backtest Report,17.875911,1.018193,-29.800315
+notebooks/random forest models/03_bagged_decision_trees_regressor.ipynb,Backtest Report,17.691423,0.99182,-29.624449
+notebooks/random forest models/04_random_forest_regressor.ipynb,Backtest Report,17.082073,0.963911,-31.46595
+notebooks/random forest models/05_random_forest_classifier.ipynb,Backtest Report,17.039264,0.977184,-30.686674
+notebooks/random forest models/06_decision_tree_classifier_time_split.ipynb,Backtest Report,12.767687,0.723665,-16.727732
+notebooks/random forest models/07_random_forest_classifier_time_split.ipynb,Backtest Report,19.700468,0.987652,-13.275442
+notebooks/random forest models/08_random_forest_cointegration_pairs_time_split.ipynb,RF Cointegration Pairs - Backtest Report,2.071068,0.249845,-8.610758

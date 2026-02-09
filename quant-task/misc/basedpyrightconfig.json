@@ -1,0 +1,7 @@
+{
+  "venvPath": "/home/anivarth/college/quant-task",
+  "venv": "venv",
+  "pythonVersion": "3.13",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "none"
+}

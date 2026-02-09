@@ -1,0 +1,27 @@
+,Backtest Report
+Start,2024-02-14 00:00:00
+End,2026-01-16 00:00:00
+Duration,702 days 00:00:00
+Initial Equity,1000000.0
+Final Equity,726782.5865597856
+Equity Peak,1003907.0116353721
+Total Return [%],-27.321741344021433
+CAGR [%],-15.367087027808246
+Volatility (ann) [%],13.300099067701208
+Sharpe,-1.1852673894615564
+Sortino,-1.9692060119573673
+Max Drawdown [%],-29.796293172092227
+Calmar,-0.5157382141128138
+Best Day [%],5.416396429917425
+Worst Day [%],-3.3622841221259914
+Avg Gross Exposure,1.0008834112595764
+Avg Net Exposure,-6.321145585339918e-19
+Exposure Time [%],100.0
+Rebalance Days,483
+Total Turnover,731812286.5410572
+Avg Daily Turnover,1515139.309608814
+Transaction Cost (bps),5.0
+Total Costs,365906.14327052864
+Costs / Initial Equity [%],36.59061432705286
+Benchmark Total Return [%],64.60882012548332
+Benchmark CAGR [%],29.767623750090678

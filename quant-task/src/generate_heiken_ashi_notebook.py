@@ -1,0 +1,219 @@
+import json
+import os
+from typing import Any, Dict, List
+
+
+def _source_lines(text: str) -> List[str]:
+    lines = text.splitlines(keepends=True)
+    if not lines:
+        return [""]
+    if not lines[-1].endswith("\n"):
+        lines[-1] += "\n"
+    return lines
+
+
+def _md(text: str) -> Dict[str, Any]:
+    return {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": _source_lines(text),
+    }
+
+
+def _code(code: str) -> Dict[str, Any]:
+    return {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": _source_lines(code),
+    }
+
+
+def create_notebook() -> None:
+    cells: List[Dict[str, Any]] = []
+
+    cells.append(
+        _md(
+            "# Heiken Ashi Trading Strategy\n"
+            "This notebook implements and backtests a trading strategy based on **Heiken Ashi Indicators**.\n"
+            "\n"
+            "### Strategy Logic:\n"
+            "- **Buy (Long Entry)**: On the first green Heiken Ashi candle (HA Close > HA Open).\n"
+            "- **Sell (Exit)**: On the first red Heiken Ashi candle (HA Close < HA Open) following a buy.\n"
+            "\n"
+            "We use the project's built-in modular backtester with `strict_signals=True` to simulate discrete entry and exit events.\n"
+        )
+    )
+
+    cells.append(
+        _md(
+            "## 0) Setup\n"
+            "Imports from the local `src` directory.\n"
+        )
+    )
+
+    cells.append(
+        _code(
+            "import os, sys\n"
+            "import numpy as np\n"
+            "import pandas as pd\n"
+            "from bokeh.io import output_notebook, show\n"
+            "\n"
+            "# --- Setup correct working directory (ROOT) ---\n"
+            "if os.getcwd().endswith('notebooks'):\n"
+            "    os.chdir('..')\n"
+            "\n"
+            "ROOT = os.getcwd()\n"
+            "if ROOT not in sys.path:\n"
+            "    sys.path.insert(0, ROOT)\n"
+            "\n"
+            "from src.backtester.data import load_cleaned_assets, align_close_prices\n"
+            "from src.backtester.engine import BacktestConfig, run_backtest\n"
+            "from src.backtester.metrics import compute_performance_stats\n"
+            "from src.backtester.models import HeikenAshiMicroModel, combine_models_to_weights\n"
+            "from src.backtester.bokeh_plots import build_interactive_portfolio_layout\n"
+            "from src.backtester.report import compute_backtest_report\n"
+            "\n"
+            "output_notebook()\n"
+        )
+    )
+
+    cells.append(
+        _md(
+            "## 0.1) Backtest Configuration\n"
+            "We enable `strict_signals=True` for event-driven entry/exit simulations.\n"
+        )
+    )
+
+    cells.append(
+        _code(
+            "cfg = BacktestConfig(\n"
+            "    initial_equity=1_000_000,\n"
+            "    transaction_cost_bps=5,\n"
+            "    rebalance=None,  # Trade on signal changes\n"
+            "    mode='event_driven',\n"
+            "    strict_signals=True,\n"
+            "    stop_loss_pct=0.0\n"
+            ")\n"
+            "cfg\n"
+        )
+    )
+
+    cells.append(
+        _md("## 1) Data Loading\n")
+    )
+
+    cells.append(
+        _code(
+            "assets = load_cleaned_assets(symbols=None)\n"
+            "close = align_close_prices(assets)\n"
+            "open_prices = pd.concat([df['Open'].astype(float).rename(s) for s, df in assets.items()], axis=1).sort_index()\n"
+            "high_prices = pd.concat([df['High'].astype(float).rename(s) for s, df in assets.items()], axis=1).sort_index()\n"
+            "low_prices = pd.concat([df['Low'].astype(float).rename(s) for s, df in assets.items()], axis=1).sort_index()\n"
+            "close.tail()\n"
+        )
+    )
+
+    cells.append(
+        _md(
+            "## 2) Market Proxy for Comparison\n"
+            "We compute a market proxy OHLCV for the Bokeh visualization.\n"
+        )
+    )
+
+    cells.append(
+        _code(
+            "def build_market_proxy_ohlcv(assets, index):\n"
+            "    opens = pd.concat([df['Open'].astype(float).reindex(index) for df in assets.values()], axis=1).mean(axis=1)\n"
+            "    highs = pd.concat([df['High'].astype(float).reindex(index) for df in assets.values()], axis=1).mean(axis=1)\n"
+            "    lows = pd.concat([df['Low'].astype(float).reindex(index) for df in assets.values()], axis=1).mean(axis=1)\n"
+            "    closes = pd.concat([df['Close'].astype(float).reindex(index) for df in assets.values()], axis=1).mean(axis=1)\n"
+            "    return pd.DataFrame({'Open': opens, 'High': highs, 'Low': lows, 'Close': closes})\n"
+            "\n"
+            "market_df = build_market_proxy_ohlcv(assets, close.index)\n"
+            "market_df.tail()\n"
+        )
+    )
+
+    cells.append(
+        _md("## 3) Heiken Ashi Strategy Implementation\n"
+            "We use the `HeikenAshiMicroModel` which calculates HA candles and discrete signals internally.\n")
+    )
+
+    cells.append(
+        _code(
+            "model = HeikenAshiMicroModel()\n"
+            "# We scale signals by 0.1 to allocate 10% of portfolio per asset if multiple assets trigger\n"
+            "raw_signals = model.compute_signals(assets)\n"
+            "signals = raw_signals * 0.16 # Example allocation\n"
+            "signals.tail()\n"
+        )
+    )
+
+    cells.append(
+        _md("## 4) Backtest Execution\n")
+    )
+
+    cells.append(
+        _code(
+            "print('Running Heiken Ashi Strategy...')\n"
+            "res = run_backtest(\n"
+            "    close_prices=close, \n"
+            "    weights=signals, \n"
+            "    config=cfg, \n"
+            "    open_prices=open_prices,\n"
+            "    high_prices=high_prices,\n"
+            "    low_prices=low_prices\n"
+            ")\n"
+            "report = compute_backtest_report(result=res, close_prices=close, benchmark='equal_weight')\n"
+            "display(report)\n"
+        )
+    )
+
+    cells.append(
+        _md("## 5) Interactive Bokeh Visualization\n")
+    )
+
+    cells.append(
+        _code(
+            "layout = build_interactive_portfolio_layout(\n"
+            "    market_ohlcv=market_df,\n"
+            "    equity=res.equity,\n"
+            "    returns=res.returns,\n"
+            "    weights=res.weights,\n"
+            "    turnover=res.turnover,\n"
+            "    costs=res.costs,\n"
+            "    close_prices=close, \n"
+            "    title='Heiken Ashi Strategy'\n"
+            ")\n"
+            "show(layout)\n"
+        )
+    )
+
+    nb = {
+        "cells": cells,
+        "metadata": {
+            "kernelspec": {
+                "display_name": "Python 3",
+                "language": "python",
+                "name": "python3",
+            },
+            "language_info": {
+                "name": "python",
+                "version": "3",
+            },
+        },
+        "nbformat": 4,
+        "nbformat_minor": 5,
+    }
+
+    os.makedirs("notebooks", exist_ok=True)
+    out_path = os.path.join("notebooks", "Heiken_Ashi_Strategy.ipynb")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(nb, f, indent=1, ensure_ascii=True)
+    print(f"Wrote {out_path}")
+
+
+if __name__ == "__main__":
+    create_notebook()

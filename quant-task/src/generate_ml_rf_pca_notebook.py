@@ -1,0 +1,323 @@
+import json
+import os
+
+def generate_rf_pca_notebook():
+    notebook = {
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": [
+                    "# Random Forest with PCA-Grouped Features\n",
+                    "This notebook implements a Random Forest Regressor using PCA-reduced feature sets from four categories:\n",
+                    "- **Volume**\n",
+                    "- **Volatility**\n",
+                    "- **Trend**\n",
+                    "- **Momentum**\n",
+                    "\n",
+                    "The model uses a time-wise split and the regular backtesting engine with Bokeh JS output."
+                ]
+            },
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": ["## 0) Setup"]
+            },
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": [
+                    "import os, sys\n",
+                    "import numpy as np\n",
+                    "import pandas as pd\n",
+                    "import matplotlib.pyplot as plt\n",
+                    "from sklearn.ensemble import RandomForestRegressor\n",
+                    "from sklearn.impute import SimpleImputer\n",
+                    "from sklearn.preprocessing import StandardScaler\n",
+                    "from sklearn.decomposition import PCA\n",
+                    "from sklearn.pipeline import Pipeline\n",
+                    "from bokeh.io import output_notebook, show\n",
+                    "\n",
+                    "output_notebook()\n",
+                    "\n",
+                    "# --- Setup correct working directory (ROOT) ---\n",
+                    "if os.getcwd().endswith('notebooks'):\n",
+                    "    os.chdir('..')\n",
+                    "\n",
+                    "ROOT = os.getcwd()\n",
+                    "if ROOT not in sys.path:\n",
+                    "    sys.path.insert(0, ROOT)\n",
+                    "\n",
+                    "from src.backtester.data import align_close_prices, load_cleaned_assets\n",
+                    "from src.backtester.engine import BacktestConfig, run_backtest\n",
+                    "from src.backtester.report import compute_backtest_report\n",
+                    "from src.backtester.bokeh_plots import build_interactive_portfolio_layout\n",
+                    "\n",
+                    "FEATURES_PARQUET_PATH = 'dataset/features/all_features.parquet'\n",
+                    "TARGET_COL = 'ret_1d'\n",
+                    "TARGET_FWD_COL = 'y_ret_1d_fwd'\n",
+                    "SEED = 42"
+                ]
+            },
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": ["## 1) Data Loading & Feature Categorization"]
+            },
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": [
+                    "df = pd.read_parquet(FEATURES_PARQUET_PATH)\n",
+                    "if 'Date' in df.columns:\n",
+                    "    df['Date'] = pd.to_datetime(df['Date'])\n",
+                    "    df = df.set_index('Date')\n",
+                    "\n",
+                    "# Create Target\n",
+                    "df[TARGET_FWD_COL] = df.groupby('Asset_ID', sort=False)[TARGET_COL].shift(-1)\n",
+                    "df = df.dropna(subset=[TARGET_FWD_COL])\n",
+                    "\n",
+                    "# Categorize features\n",
+                    "volume_features = [\n",
+                    "    'log_volume', 'volume_roll_mean_5', 'volume_roll_mean_20', 'volume_roll_mean_60', \n",
+                    "    'volume_roll_std_5', 'volume_roll_std_20', 'volume_roll_std_60', \n",
+                    "    'volume_zscore_5', 'volume_zscore_20', 'volume_zscore_60', \n",
+                    "    'volume_minmax_20', 'obv', 'obv_roc_10', 'wrobv_20', 'ad_line'\n",
+                    "]\n",
+                    "volatility_features = [\n",
+                    "    'logret_roll_var_5', 'logret_roll_var_10', 'logret_roll_var_20', 'logret_roll_var_60', \n",
+                    "    'logret_roll_std_5', 'logret_roll_std_10', 'logret_roll_std_20', 'logret_roll_std_60', \n",
+                    "    'atr_14', 'realized_vol_20', 'bb_bb_bandwidth'\n",
+                    "]\n",
+                    "trend_features = [\n",
+                    "    'sma_20', 'sma_50', 'ha_ha_open', 'ha_ha_high', 'ha_ha_low', 'ha_ha_close', \n",
+                    "    'sma_ratio_20', 'ema_ratio_20', 'bb_bb_mid', 'bb_bb_upper', 'bb_bb_lower', \n",
+                    "    'bb_bb_percent_b', 'adx_plus_di', 'adx_minus_di', 'adx_adx', 'adx_adx_raw', \n",
+                    "    'aroon_aroon_up', 'aroon_aroon_down', 'ichimoku_ichimoku_conv', \n",
+                    "    'ichimoku_ichimoku_base', 'ichimoku_ichimoku_span_a', 'ichimoku_ichimoku_span_b', \n",
+                    "    'ichimoku_ichimoku_lagging', 'bos', 'choch', 'mss'\n",
+                    "]\n",
+                    "momentum_features = [\n",
+                    "    'rsi_14', 'macd_macd', 'macd_macd_signal', 'macd_macd_hist', \n",
+                    "    'rmacd_12_26_9', 'stoch_stoch_k', 'stoch_stoch_d', 'roc_10', 'cci_20'\n",
+                    "]\n",
+                    "\n",
+                    "all_buckets = {\n",
+                    "    'Volume': volume_features,\n",
+                    "    'Volatility': volatility_features,\n",
+                    "    'Trend': trend_features,\n",
+                    "    'Momentum': momentum_features\n",
+                    "}\n",
+                    "\n",
+                    "# Verify if all exist\n",
+                    "for name, cols in all_buckets.items():\n",
+                    "    missing = [c for c in cols if c not in df.columns]\n",
+                    "    if missing:\n",
+                    "        print(f'Warning: {name} missing {missing}')\n",
+                    "        all_buckets[name] = [c for c in cols if c in df.columns]\n",
+                    "\n",
+                    "# Time-wise split\n",
+                    "cutoff_date = '2023-01-01'\n",
+                    "df_train = df[df.index < cutoff_date].copy()\n",
+                    "df_test = df[df.index >= cutoff_date].copy()\n",
+                    "\n",
+                    "print(f'Train range: {df_train.index.min()} to {df_train.index.max()}')\n",
+                    "print(f'Test range: {df_test.index.min()} to {df_test.index.max()}')"
+                ]
+            },
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": ["## 2) Stepwise PCA"]
+            },
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": [
+                    "def apply_pca_to_bucket(df_tr, df_te, cols, n_comp=3):\n",
+                    "    # Impute and Scale first\n",
+                    "    pipe = Pipeline([\n",
+                    "        ('imputer', SimpleImputer(strategy='median')),\n",
+                    "        ('scaler', StandardScaler()),\n",
+                    "        ('pca', PCA(n_components=n_comp))\n",
+                    "    ])\n",
+                    "    \n",
+                    "    X_tr = df_tr[cols].replace([np.inf, -np.inf], np.nan)\n",
+                    "    X_te = df_te[cols].replace([np.inf, -np.inf], np.nan)\n",
+                    "    \n",
+                    "    pca_tr = pipe.fit_transform(X_tr)\n",
+                    "    pca_te = pipe.transform(X_te)\n",
+                    "    \n",
+                    "    evr = pipe.named_steps['pca'].explained_variance_ratio_\n",
+                    "    print(f'Explained Variance: {evr.sum():.2%}')\n",
+                    "    \n",
+                    "    return pca_tr, pca_te, pipe\n",
+                    "\n",
+                    "pca_train_list = []\n",
+                    "pca_test_list = []\n",
+                    "fitted_pca_pipes = {}\n",
+                    "\n",
+                    "for bucket_name, cols in all_buckets.items():\n",
+                    "    print(f'\\nProcessing Bucket: {bucket_name}')\n",
+                    "    tr_res, te_res, pipe = apply_pca_to_bucket(df_train, df_test, cols, n_comp=3)\n",
+                    "    pca_train_list.append(tr_res)\n",
+                    "    pca_test_list.append(te_res)\n",
+                    "    fitted_pca_pipes[bucket_name] = (pipe, cols)\n",
+                    "\n",
+                    "X_train_pca = np.hstack(pca_train_list)\n",
+                    "X_test_pca = np.hstack(pca_test_list)\n",
+                    "y_train = df_train[TARGET_FWD_COL]\n",
+                    "y_test = df_test[TARGET_FWD_COL]\n",
+                    "\n",
+                    "print(f'\\nFinal feature shape: {X_train_pca.shape}')"
+                ]
+            },
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": ["## 2.1) PCA Explained Variance & Loadings"]
+            },
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": [
+                    "import matplotlib.pyplot as plt\n",
+                    "\n",
+                    "plt.figure(figsize=(15, 10))\n",
+                    "for i, (name, (pipe, cols)) in enumerate(fitted_pca_pipes.items()):\n",
+                    "    pca = pipe.named_steps['pca']\n",
+                    "    # Get absolute loadings for PC1\n",
+                    "    loadings = np.abs(pca.components_[0])\n",
+                    "    top_idx = np.argsort(loadings)[-10:]\n",
+                    "    top_features = [cols[j] for j in top_idx]\n",
+                    "    top_loadings = loadings[top_idx]\n",
+                    "    \n",
+                    "    plt.subplot(2, 2, i+1)\n",
+                    "    plt.barh(top_features, top_loadings, color='skyblue')\n",
+                    "    plt.title(f'Top Indicators for PC1: {name}')\n",
+                    "    plt.xlabel('Absolute Loading Weight')\n",
+                    "    \n",
+                    "plt.tight_layout()\n",
+                    "plt.show()\n",
+                    "\n",
+                    "for name, (pipe, cols) in fitted_pca_pipes.items():\n",
+                    "    pca = pipe.named_steps['pca']\n",
+                    "    loadings = np.abs(pca.components_[0])\n",
+                    "    top_feat = cols[np.argmax(loadings)]\n",
+                    "    print(f'Most explainable indicator for {name}: {top_feat}')"
+                ]
+            },
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": ["## 3) Random Forest Model"]
+            },
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": [
+                    "rf = RandomForestRegressor(\n",
+                    "    n_estimators=300,\n",
+                    "    max_depth=10,\n",
+                    "    min_samples_leaf=50,\n",
+                    "    n_jobs=-1,\n",
+                    "    random_state=SEED\n",
+                    ")\n",
+                    "\n",
+                    "print('Training Random Forest...')\n",
+                    "rf.fit(X_train_pca, y_train)\n",
+                    "\n",
+                    "pred_test = rf.predict(X_test_pca)\n",
+                    "df_test['y_pred'] = pred_test\n",
+                    "\n",
+                    "from sklearn.metrics import mean_squared_error\n",
+                    "rmse = np.sqrt(mean_squared_error(y_test, pred_test))\n",
+                    "print(f'Test RMSE: {rmse:.6f}')"
+                ]
+            },
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": ["## 4) Backtesting with Bokeh"]
+            },
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": [
+                    "test_syms = df_test['Asset_ID'].unique()\n",
+                    "assets_dict = load_cleaned_assets(symbols=test_syms)\n",
+                    "close_prices = align_close_prices(assets_dict)\n",
+                    "\n",
+                    "def run_ml_backtest(preds_col):\n",
+                    "    # Prepare weights: Top 5 assets per day based on predicted returns\n",
+                    "    w = df_test.pivot(columns='Asset_ID', values=preds_col).reindex(close_prices.index).fillna(0)\n",
+                    "    w_rank = w.rank(axis=1, ascending=False)\n",
+                    "    w_final = ((w_rank <= 5) & (w > 0)).astype(float)\n",
+                    "    w_final = w_final.div(w_final.sum(axis=1), axis=0).fillna(0)\n",
+                    "\n",
+                    "    config = BacktestConfig(rebalance='D', initial_equity=1_000_000, transaction_cost_bps=5.0)\n",
+                    "    res = run_backtest(close_prices, w_final, config)\n",
+                    "    report = compute_backtest_report(result=res, close_prices=close_prices)\n",
+                    "    return res, report, w_final\n",
+                    "\n",
+                    "res, report, weights = run_ml_backtest('y_pred')\n",
+                    "display(report)\n",
+                    "\n",
+                    "# Bokeh Visualization\n",
+                    "# Create synthetic market OHLCV for the proxy view\n",
+                    "market_ohlcv = pd.DataFrame({\n",
+                    "    'Open': close_prices.mean(axis=1),\n",
+                    "    'High': close_prices.mean(axis=1),\n",
+                    "    'Low': close_prices.mean(axis=1),\n",
+                    "    'Close': close_prices.mean(axis=1),\n",
+                    "    'Volume': pd.Series(0, index=close_prices.index)\n",
+                    "})\n",
+                    "\n",
+                    "layout = build_interactive_portfolio_layout(\n",
+                    "    market_ohlcv=market_ohlcv,\n",
+                    "    equity=res.equity,\n",
+                    "    returns=res.returns,\n",
+                    "    weights=weights,\n",
+                    "    turnover=res.turnover,\n",
+                    "    costs=res.costs,\n",
+                    "    close_prices=close_prices,\n",
+                    "    title='RF-PCA Strategy Portfolio Output'\n",
+                    ")\n",
+                    "show(layout)"
+                ]
+            }
+        ],
+        "metadata": {
+            "kernelspec": {
+                "display_name": "Python 3",
+                "language": "python",
+                "name": "python3"
+            },
+            "language_info": {
+                "name": "python",
+                "version": "3"
+            }
+        },
+        "nbformat": 4,
+        "nbformat_minor": 5
+    }
+
+    output_path = '/home/anivarth/college/quant-task/notebooks/ML_RF_PCA_Categorized.ipynb'
+    with open(output_path, 'w') as f:
+        json.dump(notebook, f, indent=1)
+    print(f'Generated: {output_path}')
+
+if __name__ == "__main__":
+    generate_rf_pca_notebook()

@@ -1,0 +1,371 @@
+from __future__ import annotations
+
+"""Generate Bayesian notebooks that train on the exported feature dataset.
+
+These are variants of the Chapter-10 Bayesian notebooks, but they use
+`dataset/features/all_features.parquet` as the model feature store instead of
+computing features directly from `dataset/cleaned/`.
+
+Outputs:
+`notebooks/bayesian models/feature_dataset/`.
+"""
+
+from dataclasses import dataclass
+from pathlib import Path
+
+import nbformat as nbf
+
+
+@dataclass(frozen=True)
+class NotebookSpec:
+    filename: str
+    title: str
+    intro_md: str
+    cells: list[nbf.NotebookNode]
+
+
+def _md(text: str) -> nbf.NotebookNode:
+    return nbf.v4.new_markdown_cell(text)
+
+
+def _code(code: str) -> nbf.NotebookNode:
+    return nbf.v4.new_code_cell(code)
+
+
+def _common_preamble(*, method_name: str) -> list[nbf.NotebookNode]:
+    return [
+        _md(
+            f"# Bayesian Models on Feature Dataset: {method_name}\n\n"
+            "These notebooks train on the exported feature store: `dataset/features/all_features.parquet`.\n\n"
+            "Backtesting is identical to the `ML_Linear_Models_*` notebooks: we build a daily\n"
+            "prediction matrix (Date x Asset_ID), convert it to weekly-rebalanced portfolios\n"
+            "(1/N and MPT), and run the vectorized backtest engine."
+        ),
+        _code(
+            "from __future__ import annotations\n\n"
+            "from pathlib import Path\n"
+            "import sys\n\n"
+            "import numpy as np\n"
+            "import pandas as pd\n\n"
+            "SEED = 42\n"
+            "rng = np.random.default_rng(SEED)\n\n"
+            "def find_project_root(start: Path) -> Path:\n"
+            "    p = start.resolve()\n"
+            "    for _ in range(10):\n"
+            "        if (p / 'src').exists() and (p / 'dataset').exists():\n"
+            "            return p\n"
+            "        p = p.parent\n"
+            "    raise RuntimeError(f'Could not find project root from: {start!s}')\n\n"
+            "PROJECT_ROOT = find_project_root(Path.cwd())\n"
+            "FEATURES_PARQUET = PROJECT_ROOT / 'dataset' / 'features' / 'all_features.parquet'\n\n"
+            "src_dir = PROJECT_ROOT / 'src'\n"
+            "if str(src_dir) not in sys.path:\n"
+            "    sys.path.append(str(src_dir))\n"
+        ),
+    ]
+
+
+def _backtest_cell(*, base_title: str) -> nbf.NotebookNode:
+    # Same backtest approach as in `notebooks/ML_Linear_Models_05_SMC_Indicators_TimeSplit.ipynb`,
+    # with one important fix: slice metrics to the prediction window so we don't start in 2016.
+    return _code(
+        "from IPython.display import display\n"
+        "from bokeh.io import output_notebook, show\n\n"
+        "from backtester.data import load_cleaned_assets, align_close_prices\n"
+        "from backtester.engine import BacktestConfig, run_backtest\n"
+        "from backtester.report import compute_backtest_report\n"
+        "from backtester.bokeh_plots import build_interactive_portfolio_layout\n"
+        "from backtester.portfolio import equal_weight, optimize_mpt\n\n"
+        "output_notebook()\n\n"
+        "if 'pred_matrix' not in globals():\n"
+        "    raise RuntimeError('Expected `pred_matrix` (index=date, columns=Asset_ID) to exist')\n\n"
+        "pred_range = pd.DatetimeIndex(pred_matrix.index).sort_values()\n"
+        "if pred_range.empty:\n"
+        "    raise RuntimeError('pred_matrix has empty index')\n"
+        "bt_start = pd.Timestamp(pred_range[0])\n"
+        "bt_end = pd.Timestamp(pred_range[-1])\n\n"
+        "bt_assets = sorted([str(c) for c in pred_matrix.columns.tolist()])\n"
+        "CLEANED_DIR = PROJECT_ROOT / 'dataset' / 'cleaned'\n"
+        "assets_ohlcv = load_cleaned_assets(symbols=bt_assets, cleaned_dir=str(CLEANED_DIR))\n"
+        "close_prices = align_close_prices(assets_ohlcv)\n\n"
+        "pred_matrix = pred_matrix.reindex(close_prices.index)\n"
+        "close_prices = close_prices.loc[bt_start:bt_end]\n"
+        "pred_matrix = pred_matrix.loc[bt_start:bt_end]\n"
+        "returns_matrix = close_prices.pct_change().fillna(0.0)\n\n"
+        "market_df = pd.DataFrame({\n"
+        "    'Open': pd.concat([df['Open'] for df in assets_ohlcv.values()], axis=1).mean(axis=1),\n"
+        "    'High': pd.concat([df['High'] for df in assets_ohlcv.values()], axis=1).mean(axis=1),\n"
+        "    'Low': pd.concat([df['Low'] for df in assets_ohlcv.values()], axis=1).mean(axis=1),\n"
+        "    'Close': pd.concat([df['Close'] for df in assets_ohlcv.values()], axis=1).mean(axis=1),\n"
+        "    'Volume': pd.concat([df['Volume'] for df in assets_ohlcv.values()], axis=1).sum(axis=1),\n"
+        "}).sort_index().loc[bt_start:bt_end]\n\n"
+        "REBALANCE_FREQ = 'W'\n"
+        "TOP_K = min(20, len(bt_assets))\n"
+        "LOOKBACK_DAYS = 126\n\n"
+        "def build_weights_from_predictions(pred_matrix: pd.DataFrame, *, pm_style: str) -> pd.DataFrame:\n"
+        "    rebal_dates = set(pd.Series(pred_matrix.index, index=pred_matrix.index).resample(REBALANCE_FREQ).last().dropna().tolist())\n"
+        "    w_last = pd.Series(0.0, index=bt_assets)\n"
+        "    rows = []\n"
+        "    for dt in pred_matrix.index:\n"
+        "        if dt in rebal_dates:\n"
+        "            row = pred_matrix.loc[dt].dropna().sort_values(ascending=False)\n"
+        "            top = row.head(TOP_K)\n"
+        "            candidates = [a for a, v in top.items() if np.isfinite(v) and float(v) > 0.0]\n"
+        "            if not candidates:\n"
+        "                w_last = pd.Series(0.0, index=bt_assets)\n"
+        "            else:\n"
+        "                if pm_style == '1N':\n"
+        "                    w_dict = equal_weight(candidates)\n"
+        "                elif pm_style == 'MPT':\n"
+        "                    w_dict = optimize_mpt(returns_matrix, candidates, dt, lookback_days=LOOKBACK_DAYS)\n"
+        "                else:\n"
+        "                    raise ValueError(f'Unknown pm_style: {pm_style!r}')\n"
+        "                w_last = pd.Series(0.0, index=bt_assets)\n"
+        "                for a, w in w_dict.items():\n"
+        "                    w_last[str(a)] = float(w)\n"
+        "        rows.append(w_last)\n"
+        "    return pd.DataFrame(rows, index=pred_matrix.index, columns=bt_assets).fillna(0.0)\n\n"
+        "cfg = BacktestConfig(initial_equity=1_000_000.0, transaction_cost_bps=5.0, mode='vectorized')\n\n"
+        "compare_rows = []\n"
+        "results = {}\n"
+        "for pm_style in ['1N', 'MPT']:\n"
+        "    w = build_weights_from_predictions(pred_matrix, pm_style=pm_style)\n"
+        "    res = run_backtest(close_prices, w, config=cfg)\n"
+        "    rpt = compute_backtest_report(result=res, close_prices=close_prices)\n"
+        "    results[pm_style] = (w, res, rpt)\n"
+        "    compare_rows.append({\n"
+        "        'style': pm_style,\n"
+        "        'Total Return [%]': float(rpt['Total Return [%]']),\n"
+        "        'CAGR [%]': float(rpt['CAGR [%]']),\n"
+        "        'Sharpe': float(rpt['Sharpe']),\n"
+        "        'Max Drawdown [%]': float(rpt['Max Drawdown [%]']),\n"
+        "    })\n"
+        "compare = pd.DataFrame(compare_rows).sort_values('Total Return [%]', ascending=False).reset_index(drop=True)\n"
+        "display(compare)\n\n"
+        "BASE_TITLE = " + repr(base_title) + "\n"
+        "for pm_style in ['1N', 'MPT']:\n"
+        "    w, res, rpt = results[pm_style]\n"
+        "    title = BASE_TITLE + ' - ' + pm_style\n"
+        "    display(rpt.to_frame(title))\n"
+        "    layout = build_interactive_portfolio_layout(\n"
+        "        market_ohlcv=market_df,\n"
+        "        equity=res.equity,\n"
+        "        returns=res.returns,\n"
+        "        weights=res.weights,\n"
+        "        turnover=res.turnover,\n"
+        "        costs=res.costs,\n"
+        "        close_prices=close_prices,\n"
+        "        title=title,\n"
+        "    )\n"
+        "    show(layout)\n"
+    )
+
+
+def _nb(spec: NotebookSpec) -> nbf.NotebookNode:
+    nb = nbf.v4.new_notebook()
+    nb["metadata"] = {
+        "kernelspec": {
+            "display_name": ".venv_uv",
+            "language": "python",
+            "name": "python3",
+        },
+        "language_info": {"name": "python", "version": "3.13"},
+    }
+    nb.cells = [_md(spec.title), _md(spec.intro_md), *spec.cells]
+    return nb
+
+
+def _write(nb: nbf.NotebookNode, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        nbf.write(nb, f)
+
+
+def create_notebooks(*, out_dir: Path) -> list[Path]:
+    specs: list[NotebookSpec] = []
+
+    specs.append(
+        NotebookSpec(
+            filename="01_conjugate_priors_beta_binomial_direction_features.ipynb",
+            title="# Conjugate Priors on Feature Dataset (Beta-Binomial Direction Model)",
+            intro_md=(
+                "We reuse the Chapter 10 conjugate-prior idea, but source the returns from\n"
+                "`dataset/features/all_features.parquet` rather than computing them from cleaned OHLCV.\n\n"
+                "Model:\n"
+                "- $y_t=1$ if next-day return is positive, else $0$\n"
+                "- $y_t\\sim\\text{Bernoulli}(p)$, $p\\sim\\text{Beta}(\\alpha_0,\\beta_0)$\n"
+                "- Posterior mean gives $\\hat p_t$; we trade on $\\hat p_t-0.5$.\n"
+            ),
+            cells=[
+                *_common_preamble(method_name="Conjugate Priors (Feature Store)"),
+                _code(
+                    "TARGET_COL = 'ret_1d'\n"
+                    "TARGET_FWD_COL = 'y_ret_1d_fwd'\n\n"
+                    "df = pd.read_parquet(FEATURES_PARQUET)\n"
+                    "if 'Date' in df.columns:\n"
+                    "    df['Date'] = pd.to_datetime(df['Date'])\n"
+                    "    df = df.set_index('Date')\n"
+                    "df = df.sort_index().copy()\n"
+                    "df[TARGET_FWD_COL] = df.groupby('Asset_ID', sort=False)[TARGET_COL].shift(-1)\n"
+                    "df = df.dropna(subset=[TARGET_FWD_COL])\n"
+                    "df['y_up_fwd'] = (df[TARGET_FWD_COL] > 0).astype(int)\n\n"
+                    "# Time split (same policy)\n"
+                    "TRAIN_YEARS = 7\nVAL_MONTHS = 18\nTEST_MONTHS = 18\n\n"
+                    "def align_to_trading_date(index: pd.DatetimeIndex, ts: pd.Timestamp) -> pd.Timestamp:\n"
+                    "    pos = int(index.searchsorted(ts, side='left'))\n"
+                    "    if pos >= len(index):\n"
+                    "        return pd.Timestamp(index[-1])\n"
+                    "    return pd.Timestamp(index[pos])\n\n"
+                    "idx = pd.DatetimeIndex(df.index.unique()).sort_values()\n"
+                    "end = pd.Timestamp(idx[-1])\n"
+                    "raw_test_start = end - pd.DateOffset(months=TEST_MONTHS)\n"
+                    "raw_val_start = raw_test_start - pd.DateOffset(months=VAL_MONTHS)\n"
+                    "raw_train_start = raw_val_start - pd.DateOffset(years=TRAIN_YEARS)\n"
+                    "test_start = align_to_trading_date(idx, pd.Timestamp(raw_test_start))\n"
+                    "val_start = align_to_trading_date(idx, pd.Timestamp(raw_val_start))\n"
+                    "train_start = align_to_trading_date(idx, pd.Timestamp(raw_train_start))\n"
+                    "print('aligned boundaries:', train_start, val_start, test_start, end)\n\n"
+                    "y_mat = df.pivot_table(index=df.index, columns='Asset_ID', values='y_up_fwd', aggfunc='mean').sort_index()\n\n"
+                    "ALPHA0 = 1.0\nBETA0 = 1.0\nLOOKBACK_DAYS = 252\n\n"
+                    "s = y_mat.rolling(LOOKBACK_DAYS, min_periods=10).sum().shift(1)\n"
+                    "n = y_mat.rolling(LOOKBACK_DAYS, min_periods=10).count().shift(1)\n"
+                    "p_up = (ALPHA0 + s) / (ALPHA0 + BETA0 + n)\n\n"
+                    "pred_matrix = (p_up - 0.5).loc[test_start:end].fillna(0.0)\n"
+                ),
+                _backtest_cell(base_title="Conjugate Priors (Feature Store)"),
+            ],
+        )
+    )
+
+    specs.append(
+        NotebookSpec(
+            filename="03_bayesian_logistic_regression_mcmc_metropolis_features.ipynb",
+            title="# Bayesian Logistic Regression (MCMC: Metropolis) on Feature Dataset",
+            intro_md=(
+                "This is the Chapter-10-style Bayesian logistic regression, but trained on the\n"
+                "exported feature store `dataset/features/all_features.parquet`.\n\n"
+                "Because random-walk Metropolis does not scale well with very high dimension,\n"
+                "we restrict the design matrix to a small set of informative features (top-K by\n"
+                "mutual information if available).\n"
+            ),
+            cells=[
+                *_common_preamble(
+                    method_name="Bayesian Logistic Regression (MCMC, Feature Store)"
+                ),
+                _code(
+                    "import math\n"
+                    "from scipy.special import expit\n"
+                    "from sklearn.impute import SimpleImputer\n"
+                    "from sklearn.preprocessing import StandardScaler\n\n"
+                    "TARGET_COL = 'ret_1d'\n"
+                    "TARGET_FWD_COL = 'y_ret_1d_fwd'\n\n"
+                    "df = pd.read_parquet(FEATURES_PARQUET)\n"
+                    "if 'Date' in df.columns:\n"
+                    "    df['Date'] = pd.to_datetime(df['Date'])\n"
+                    "    df = df.set_index('Date')\n"
+                    "df = df.sort_index().copy()\n"
+                    "df[TARGET_FWD_COL] = df.groupby('Asset_ID', sort=False)[TARGET_COL].shift(-1)\n"
+                    "df = df.dropna(subset=[TARGET_FWD_COL])\n"
+                    "df['y_up_fwd'] = (df[TARGET_FWD_COL] > 0).astype(int)\n\n"
+                    "# Time split\n"
+                    "TRAIN_YEARS = 7\nVAL_MONTHS = 18\nTEST_MONTHS = 18\n\n"
+                    "def align_to_trading_date(index: pd.DatetimeIndex, ts: pd.Timestamp) -> pd.Timestamp:\n"
+                    "    pos = int(index.searchsorted(ts, side='left'))\n"
+                    "    if pos >= len(index):\n"
+                    "        return pd.Timestamp(index[-1])\n"
+                    "    return pd.Timestamp(index[pos])\n\n"
+                    "idx = pd.DatetimeIndex(df.index.unique()).sort_values()\n"
+                    "end = pd.Timestamp(idx[-1])\n"
+                    "raw_test_start = end - pd.DateOffset(months=TEST_MONTHS)\n"
+                    "raw_val_start = raw_test_start - pd.DateOffset(months=VAL_MONTHS)\n"
+                    "raw_train_start = raw_val_start - pd.DateOffset(years=TRAIN_YEARS)\n"
+                    "test_start = align_to_trading_date(idx, pd.Timestamp(raw_test_start))\n"
+                    "val_start = align_to_trading_date(idx, pd.Timestamp(raw_val_start))\n"
+                    "train_start = align_to_trading_date(idx, pd.Timestamp(raw_train_start))\n\n"
+                    "df_train = df.loc[(df.index >= train_start) & (df.index < val_start)].copy()\n"
+                    "df_test = df.loc[(df.index >= test_start) & (df.index <= end)].copy()\n\n"
+                    "exclude_cols = {'Asset_ID', TARGET_FWD_COL, 'y_up_fwd'}\n"
+                    "all_num = [c for c in df.columns if c not in exclude_cols and pd.api.types.is_numeric_dtype(df[c])]\n\n"
+                    "# Prefer MI-ranked feature list from linear models outputs (if present)\n"
+                    "mi_path = PROJECT_ROOT / 'notebooks' / 'dataset' / 'model_outputs' / 'linear_models_01' / 'mutual_information_top200.csv'\n"
+                    "TOP_K = 25\n"
+                    "if mi_path.exists():\n"
+                    "    mi = pd.read_csv(mi_path)\n"
+                    "    # Expected columns: `feature` and (optionally) MI score.\n"
+                    "    col_feature = 'feature' if 'feature' in mi.columns else mi.columns[0]\n"
+                    "    candidates = [f for f in mi[col_feature].astype(str).tolist() if f in all_num]\n"
+                    "    feature_cols = candidates[:TOP_K] if candidates else all_num[:TOP_K]\n"
+                    "else:\n"
+                    "    feature_cols = all_num[:TOP_K]\n\n"
+                    "print('n_features_used:', len(feature_cols))\n\n"
+                    "X_train = df_train[feature_cols].replace([np.inf, -np.inf], np.nan)\n"
+                    "y_train = df_train['y_up_fwd'].astype(int).to_numpy()\n"
+                    "X_test = df_test[feature_cols].replace([np.inf, -np.inf], np.nan)\n\n"
+                    "imp = SimpleImputer(strategy='median')\n"
+                    "scaler = StandardScaler()\n"
+                    "Xtr = scaler.fit_transform(imp.fit_transform(X_train))\n"
+                    "Xte = scaler.transform(imp.transform(X_test))\n"
+                    "Xtr = np.hstack([np.ones((Xtr.shape[0], 1)), Xtr])\n"
+                    "Xte = np.hstack([np.ones((Xte.shape[0], 1)), Xte])\n\n"
+                    "# MCMC subsampling for speed\n"
+                    "N_TRAIN_SAMPLES = 20_000\n"
+                    "if Xtr.shape[0] > N_TRAIN_SAMPLES:\n"
+                    "    idx_s = rng.choice(Xtr.shape[0], size=N_TRAIN_SAMPLES, replace=False)\n"
+                    "    Xtr_s = Xtr[idx_s]\n"
+                    "    y_s = y_train[idx_s]\n"
+                    "else:\n"
+                    "    Xtr_s = Xtr\n"
+                    "    y_s = y_train\n\n"
+                    "TAU2 = 10.0**2\n"
+                    "def log_post(beta: np.ndarray) -> float:\n"
+                    "    z = Xtr_s @ beta\n"
+                    "    p = expit(z)\n"
+                    "    eps = 1e-12\n"
+                    "    ll = float(np.sum(y_s * np.log(p + eps) + (1 - y_s) * np.log(1 - p + eps)))\n"
+                    "    lp = float(-0.5 * np.sum(beta[1:] ** 2) / TAU2)\n"
+                    "    return ll + lp\n\n"
+                    "N_STEPS = 4000\nBURN = 1000\nSTEP_SCALE = 0.05\n\n"
+                    "beta = np.zeros(Xtr_s.shape[1])\n"
+                    "lp = log_post(beta)\n"
+                    "samples = []\n"
+                    "accept = 0\n"
+                    "for t in range(N_STEPS):\n"
+                    "    prop = beta + rng.normal(0.0, STEP_SCALE, size=beta.shape)\n"
+                    "    lp_prop = log_post(prop)\n"
+                    "    if math.log(rng.random()) < (lp_prop - lp):\n"
+                    "        beta, lp = prop, lp_prop\n"
+                    "        accept += 1\n"
+                    "    if t >= BURN:\n"
+                    "        samples.append(beta.copy())\n"
+                    "print('accept_rate:', accept / N_STEPS)\n\n"
+                    "B = np.stack(samples, axis=0)\n"
+                    "p_samps = expit(Xte @ B.T)\n"
+                    "p_mean = p_samps.mean(axis=1)\n\n"
+                    "pred_long = pd.DataFrame({'Date': df_test.index, 'Asset_ID': df_test['Asset_ID'].to_numpy(), 'signal': p_mean - 0.5})\n"
+                    "pred_matrix = pred_long.pivot_table(index='Date', columns='Asset_ID', values='signal', aggfunc='mean').sort_index().fillna(0.0)\n"
+                ),
+                _backtest_cell(base_title="Bayes Logistic (MH, Feature Store)"),
+            ],
+        )
+    )
+
+    written: list[Path] = []
+    for spec in specs:
+        nb = _nb(spec)
+        path = out_dir / spec.filename
+        _write(nb, path)
+        written.append(path)
+    return written
+
+
+def main() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    out_dir = repo_root / "notebooks" / "bayesian models" / "feature_dataset"
+    paths = create_notebooks(out_dir=out_dir)
+    print(f"Wrote {len(paths)} notebooks:")
+    for p in paths:
+        print("-", p)
+
+
+if __name__ == "__main__":
+    main()
