@@ -7,6 +7,7 @@ pip install -r requirements.txt
 ```
 go through the italicised notebooks in the repo structure and run them.
 
+# Repo Structure
  - quant-task
 	- another testing engine : open source event based implementation
 	- Dataset
